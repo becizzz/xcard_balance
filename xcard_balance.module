@@ -1,0 +1,98 @@
+<?php
+
+/**
+ * Implements hook_menu();
+ */
+function xcard_balance_menu() {
+  $items['xcard-balance'] = array(
+    'title' => 'XCard Balance',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('xcard_balance'),
+    'access arguments' => array('access content'),
+  );
+  return $items;
+}
+
+function xcard_balance($form, &$form_state) {
+  if (isset($form_state['show_balance']) && $form_state['show_balance']) {
+    $card_number = $form_state['values']['card_number'];
+    $data = @simplexml_load_file('http://www.xcard.lv/balance.php?inf=!!xcard??&cardno=' . $card_number);
+    $response = (string)$data->res;
+    switch ($response) {
+      // Successful request.
+      case 0:
+        $form['card_number'] = array(
+          '#type' => 'item',
+          '#title' => t('Card No.'),
+          '#markup' => $card_number,
+        );
+        $form['card_balance'] = array(
+          '#type' => 'item',
+          '#title' => t('Balance'),
+          '#markup' => (string)$data->amount . ' ' . (string)$data->curr,
+        );
+        break;
+      
+      // Bad request.
+      case 1:
+        $form['bad_request'] = array(
+          '#markup' => t('Bad request! Please check the card number.'),
+          '#prefix' => '<p>',
+          '#suffix' => '</p>',
+        );
+        break;
+      
+      // Card doesn't exist.
+      case 2:
+        $form['no_card'] = array(
+          '#markup' => t('Card with number :number does not exist', array(':number' => $card_number)),
+          '#prefix' => '<p>',
+          '#suffix' => '</p>',
+        );
+        break;
+
+      default:
+        break;
+    }
+    
+    if ($response > 0) {
+      $form['check_again'] = array(
+        '#type' => 'submit',
+        '#value' => t('Check again'),
+        '#name' => 'check_again',
+      );
+    }
+  }
+  else {
+    $form['card_number'] = array(
+      '#title' => t('Card number'),
+      '#type' => 'textfield',
+      '#maxlength' => 10,
+      '#required' => TRUE,
+    );
+    $form['check_balance'] = array(
+      '#value' => t('Check balance'),
+      '#type' => 'submit',
+      '#name' => 'check_balance'
+    );
+  }
+  return $form;
+}
+
+function xcard_balance_submit($form, &$form_state) {
+  $form_state['rebuild'] = TRUE;
+  switch ($form_state['triggering_element']['#name']) {
+    case 'check_balance':
+      $form_state['show_balance'] = TRUE;
+      break;
+    
+    case 'check_again':
+      $form_state['show_balance'] = FALSE;
+      break;
+
+    default:
+      break;
+  }
+  
+}
+
